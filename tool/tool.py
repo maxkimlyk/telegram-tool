@@ -7,6 +7,7 @@ import aiogram
 import watchgod
 
 from . import config
+from . import utils
 
 Bot = None
 MessageId = None
@@ -39,7 +40,20 @@ async def handle_start(message: aiogram.types.Message):
         ChatId)
 
 
-async def on_file_modified(path: str):
+def get_parse_mode(file_extension: str) -> str:
+    default_parse_mode = ''
+    parse_mode_by_extension = {
+        'html': 'HTML',
+        'md': 'MarkdownV2',
+    }
+
+    try:
+        return parse_mode_by_extension[file_extension.lower()]
+    except KeyError:
+        return default_parse_mode
+
+
+async def update_message_with_file_content(path: str):
     global Bot, MessageId, ChatId
 
     if MessageId is None or ChatId is None:
@@ -49,8 +63,28 @@ async def on_file_modified(path: str):
     with open(path) as f:
         content = f.read()
 
-    await Bot.edit_message_text(content, ChatId, MessageId)
-    logging.info('Message updated succesfully')
+    extension = utils.get_file_extension(path)
+    parse_mode = get_parse_mode(extension)
+
+    await Bot.edit_message_text(
+        content, ChatId, MessageId, parse_mode=parse_mode
+    )
+    logging.info('Message updated succesfully %s',
+                 '({})'.format(parse_mode) if parse_mode else '')
+
+
+async def on_file_modified(path: str):
+    global Bot, MessageId, ChatId
+
+    try:
+        await update_message_with_file_content(path)
+    except BaseException as exc:
+        logging.exception('Got exception')
+        await Bot.edit_message_text(
+            'Something went wrong: {}: {}'.format(repr(exc), str(exc)),
+            ChatId,
+            MessageId,
+        )
 
 
 async def watch_file_changes(watched_file: str):
