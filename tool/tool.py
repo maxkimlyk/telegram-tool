@@ -1,13 +1,16 @@
 import argparse
+import asyncio
 import logging
 import os
 
 import aiogram
+import watchgod
 
 from . import config
 
 Bot = None
 MessageId = None
+ChatId = None
 
 
 def parse_args():
@@ -21,17 +24,40 @@ def parse_args():
 
 
 async def handle_start(message: aiogram.types.Message):
-    global MessageId
+    global MessageId, ChatId
 
     sent_message = await message.bot.send_message(
         message.chat.id,
         'OK, this message will be changed when you change watched file')
+
     MessageId = sent_message.message_id
+    ChatId = sent_message.chat.id
+
+    logging.info(
+        "Registered test message: message_id=%s, chat_id=%s",
+        MessageId,
+        ChatId)
 
 
-async def handle_test(message: aiogram.types.Message):
-    global Bot, MessageId
-    await Bot.edit_message_text('new text', message.chat.id, MessageId)
+async def on_file_modified(path: str):
+    global Bot, MessageId, ChatId
+
+    if MessageId is None or ChatId is None:
+        logging.warning('No message to write to')
+        return
+
+    with open(path) as f:
+        content = f.read()
+
+    await Bot.edit_message_text(content, ChatId, MessageId)
+    logging.info('Message updated succesfully')
+
+
+async def watch_file_changes(watched_file: str):
+    async for changes in watchgod.awatch(watched_file):
+        for change, path in changes:
+            if change == watchgod.Change.modified:
+                await on_file_modified(path)
 
 
 def main():
@@ -48,10 +74,12 @@ def main():
 
     cfg = config.load_config(args.config, os.environ)
 
-    Bot = aiogram.Bot(token=cfg['bot_token'])
+    aio_loop = asyncio.get_event_loop()
+
+    Bot = aiogram.Bot(token=cfg['bot_token'], loop=aio_loop)
     dispatcher = aiogram.Dispatcher(Bot)
 
     dispatcher.register_message_handler(handle_start, commands=['start'])
-    dispatcher.register_message_handler(handle_test, commands=['test'])
 
+    aio_loop.create_task(watch_file_changes(cfg['watched_file']))
     aiogram.executor.start_polling(dispatcher, skip_updates=True)
