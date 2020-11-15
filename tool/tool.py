@@ -58,7 +58,10 @@ async def update_message_with_file_content(path: str):
     global Bot, MessageId, ChatId
 
     if MessageId is None or ChatId is None:
-        logging.warning('No message to write to')
+        logging.warning(
+            'No registered message. '
+            'Did you forget to send "/start" to your bot?'
+        )
         return
 
     with open(path) as f:
