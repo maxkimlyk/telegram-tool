@@ -7,6 +7,7 @@ import aiogram
 from . import config
 
 Bot = None
+MessageId = None
 
 
 def parse_args():
@@ -20,9 +21,17 @@ def parse_args():
 
 
 async def handle_start(message: aiogram.types.Message):
-    await message.bot.send_message(
+    global MessageId
+
+    sent_message = await message.bot.send_message(
         message.chat.id,
         'OK, this message will be changed when you change watched file')
+    MessageId = sent_message.message_id
+
+
+async def handle_test(message: aiogram.types.Message):
+    global Bot, MessageId
+    await Bot.edit_message_text('new text', message.chat.id, MessageId)
 
 
 def main():
@@ -43,5 +52,6 @@ def main():
     dispatcher = aiogram.Dispatcher(Bot)
 
     dispatcher.register_message_handler(handle_start, commands=['start'])
+    dispatcher.register_message_handler(handle_test, commands=['test'])
 
     aiogram.executor.start_polling(dispatcher, skip_updates=True)
