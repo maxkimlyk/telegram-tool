@@ -27,6 +27,7 @@ def parse_args():
 async def handle_start(message: aiogram.types.Message):
     global MessageId, ChatId
 
+    # TODO: init with watched file content
     sent_message = await message.bot.send_message(
         message.chat.id,
         'OK, this message will be changed when you change watched file')
