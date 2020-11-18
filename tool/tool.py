@@ -70,11 +70,14 @@ async def update_message_with_file_content(path: str):
     extension = utils.get_file_extension(path)
     parse_mode = get_parse_mode(extension)
 
-    await Bot.edit_message_text(
-        content, ChatId, MessageId, parse_mode=parse_mode
-    )
-    logging.info('Message updated succesfully %s',
-                 '({})'.format(parse_mode) if parse_mode else '')
+    try:
+        await Bot.edit_message_text(
+            content, ChatId, MessageId, parse_mode=parse_mode
+        )
+        logging.info('Message updated succesfully %s',
+                     '({})'.format(parse_mode) if parse_mode else '')
+    except aiogram.utils.exceptions.MessageNotModified as exc:
+        logging.warning('%s', exc)
 
 
 async def on_file_modified(path: str):
