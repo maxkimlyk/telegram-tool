@@ -62,6 +62,8 @@ async def handle_start(message: aiogram.types.Message):
 
     store_cache()
 
+    await on_file_modified()
+
 
 async def handle_button(query: aiogram.types.CallbackQuery):
     logging.info("Button pressed: %s", query.data)
@@ -154,7 +156,7 @@ async def on_file_modified():
     except BaseException as exc:
         logging.exception('Got exception')
         await Bot.edit_message_text(
-            'Something went wrong: {}: {}'.format(repr(exc), str(exc)),
+            'Something went wrong: {}'.format(str(exc)),
             ChatId,
             MessageId,
         )
