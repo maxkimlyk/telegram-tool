@@ -43,6 +43,11 @@ async def handle_start(message: aiogram.types.Message):
         ChatId)
 
 
+async def handle_button(query: aiogram.types.CallbackQuery):
+    logging.info("Button pressed: %s", query.data)
+    await Bot.answer_callback_query(query.id)
+
+
 def get_parse_mode(file_extension: str) -> str:
     default_parse_mode = ''
     parse_mode_by_extension = {
@@ -66,6 +71,12 @@ def load_text_from_file(path: str):
     return text, parse_mode
 
 
+def trim_text(text: str, length: int) -> str:
+    if len(text) < length:
+        return text
+    return text[:length]
+
+
 def load_buttons_from_file(path: str):
     with open(path) as f:
         lines = f.readlines()
@@ -80,7 +91,8 @@ def load_buttons_from_file(path: str):
     for line in lines:
         buttons = []
         for text in line.split('|'):
-            buttons.append(aiogram.types.InlineKeyboardButton(text.strip(), callback_data='mock'))
+            text = text.strip()
+            buttons.append(aiogram.types.InlineKeyboardButton(text, callback_data=trim_text(text, 32)))
         markup.row(*buttons)
 
     return markup
@@ -162,6 +174,7 @@ def main():
     dispatcher = aiogram.Dispatcher(Bot)
 
     dispatcher.register_message_handler(handle_start, commands=['start'])
+    dispatcher.register_callback_query_handler(handle_button)
 
     WatchedTextFilePath = cfg['watched_text_file']
     WatchedButtonsFilePath = cfg['watched_buttons_file']
