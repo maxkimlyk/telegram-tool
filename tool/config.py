@@ -5,8 +5,6 @@ import yaml
 
 _ENV_MAPPING = {
     'BOT_TOKEN': 'bot_token',
-    'USER_ID': 'user_id',
-    'WATCHED_FILE': 'watched_file',
 }
 
 
