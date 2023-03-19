@@ -13,7 +13,7 @@ _ENV_MAPPING = {
 def _load_config_file(file: str):
     with open(file) as f:
         content = f.read()
-        return yaml.load(content, Loader=yaml.CLoader)
+        return yaml.load(content)
 
 
 def load_config(config_path: str, environment: Dict[str, str]):

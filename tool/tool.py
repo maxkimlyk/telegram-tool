@@ -13,6 +13,9 @@ Bot = None
 MessageId = None
 ChatId = None
 
+WatchedTextFilePath = None
+WatchedButtonsFilePath = None
+
 
 def parse_args():
     parse = argparse.ArgumentParser()
@@ -27,7 +30,6 @@ def parse_args():
 async def handle_start(message: aiogram.types.Message):
     global MessageId, ChatId
 
-    # TODO: init with watched file content
     sent_message = await message.bot.send_message(
         message.chat.id,
         'OK, this message will be changed when you change watched file')
@@ -54,7 +56,37 @@ def get_parse_mode(file_extension: str) -> str:
         return default_parse_mode
 
 
-async def update_message_with_file_content(path: str):
+def load_text_from_file(path: str):
+    with open(path) as f:
+        text = f.read()
+
+    extension = utils.get_file_extension(path)
+    parse_mode = get_parse_mode(extension)
+
+    return text, parse_mode
+
+
+def load_buttons_from_file(path: str):
+    with open(path) as f:
+        lines = f.readlines()
+
+    lines = [l for l in lines if l != '']
+
+    if not lines:
+        return None
+
+    markup = aiogram.types.InlineKeyboardMarkup()
+
+    for line in lines:
+        buttons = []
+        for text in line.split('|'):
+            buttons.append(aiogram.types.InlineKeyboardButton(text.strip(), callback_data='mock'))
+        markup.row(*buttons)
+
+    return markup
+
+
+async def update_message_with_file_content():
     global Bot, MessageId, ChatId
 
     if MessageId is None or ChatId is None:
@@ -64,27 +96,29 @@ async def update_message_with_file_content(path: str):
         )
         return
 
-    with open(path) as f:
-        content = f.read()
-
-    extension = utils.get_file_extension(path)
-    parse_mode = get_parse_mode(extension)
+    text, parse_mode = load_text_from_file(WatchedTextFilePath)
+    reply_markup = load_buttons_from_file(WatchedButtonsFilePath)
 
     try:
         await Bot.edit_message_text(
-            content, ChatId, MessageId, parse_mode=parse_mode
+            text, ChatId, MessageId, parse_mode=parse_mode
         )
         logging.info('Message updated succesfully %s',
                      '({})'.format(parse_mode) if parse_mode else '')
     except aiogram.utils.exceptions.MessageNotModified as exc:
-        logging.warning('%s', exc)
+        logging.debug('%s', exc)
+
+    try:
+        await Bot.edit_message_reply_markup(ChatId, MessageId, reply_markup=reply_markup)
+    except aiogram.utils.exceptions.MessageNotModified as exc:
+        logging.debug('%s', exc)
 
 
-async def on_file_modified(path: str):
+async def on_file_modified():
     global Bot, MessageId, ChatId
 
     try:
-        await update_message_with_file_content(path)
+        await update_message_with_file_content()
     except BaseException as exc:
         logging.exception('Got exception')
         await Bot.edit_message_text(
@@ -94,15 +128,22 @@ async def on_file_modified(path: str):
         )
 
 
-async def watch_file_changes(watched_file: str):
+async def watch_text_file_changes(watched_file: str):
     async for changes in watchgod.awatch(watched_file):
         for change, path in changes:
             if change == watchgod.Change.modified:
-                await on_file_modified(path)
+                await on_file_modified()
+
+
+async def watch_buttons_file_changes(watched_file: str):
+    async for changes in watchgod.awatch(watched_file):
+        for change, path in changes:
+            if change == watchgod.Change.modified:
+                await on_file_modified()
 
 
 def main():
-    global Bot
+    global Bot, WatchedTextFilePath, WatchedButtonsFilePath
 
     args = parse_args()
 
@@ -122,5 +163,9 @@ def main():
 
     dispatcher.register_message_handler(handle_start, commands=['start'])
 
-    aio_loop.create_task(watch_file_changes(cfg['watched_file']))
+    WatchedTextFilePath = cfg['watched_text_file']
+    WatchedButtonsFilePath = cfg['watched_buttons_file']
+
+    aio_loop.create_task(watch_text_file_changes(WatchedTextFilePath))
+    aio_loop.create_task(watch_buttons_file_changes(WatchedButtonsFilePath))
     aiogram.executor.start_polling(dispatcher, skip_updates=True)
