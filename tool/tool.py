@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 
@@ -16,6 +17,8 @@ ChatId = None
 WatchedTextFilePath = None
 WatchedButtonsFilePath = None
 
+CACHE_FILE_PATH = '/tmp/telegram-tool-cache'
+
 
 def parse_args():
     parse = argparse.ArgumentParser()
@@ -25,6 +28,21 @@ def parse_args():
                        default=None, help='Path to log file')
     args = parse.parse_args()
     return args
+
+
+def store_cache():
+    obj = {'message_id': MessageId, 'chat_id': ChatId}
+    with open(CACHE_FILE_PATH, 'w') as f:
+        json.dump(obj, f)
+
+
+def load_cache():
+    global MessageId, ChatId
+
+    with open(CACHE_FILE_PATH, 'r') as f:
+        obj = json.load(f)
+    MessageId = obj['message_id']
+    ChatId = obj['chat_id']
 
 
 async def handle_start(message: aiogram.types.Message):
@@ -41,6 +59,8 @@ async def handle_start(message: aiogram.types.Message):
         "Registered test message: message_id=%s, chat_id=%s",
         MessageId,
         ChatId)
+
+    store_cache()
 
 
 async def handle_button(query: aiogram.types.CallbackQuery):
@@ -167,6 +187,11 @@ def main():
     )
 
     cfg = config.load_config(args.config, os.environ)
+
+    try:
+        load_cache()
+    except BaseException as exc:
+        logging.info("Failed to load cache: %s", exc)
 
     aio_loop = asyncio.get_event_loop()
 
